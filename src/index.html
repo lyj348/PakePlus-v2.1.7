@@ -1,77 +1,609 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <link rel="stylesheet" href="styles.css" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>PakePlus App</title>
-        <script type="module" src="/main.js" defer></script>
-    </head>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>叫号大屏</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft YaHei', sans-serif; }
+    .led-screen-container {
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    .led-frame {
+      width: 100%;
+      height: 100%;
+      max-width: 1920px;
+      background: #fff;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      margin: 0 auto;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      position: relative;
+    }
+    .led-frame.is-fullscreen {
+      max-width: none;
+      width: 100%;
+      height: 100%;
+      border-radius: 0;
+    }
+    .led-frame.is-fullscreen .main-display-area { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .led-frame.is-fullscreen .table-container {
+      flex: 1; min-height: 0; max-height: 100%;
+      overflow-x: hidden; overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .window-controls-wrapper {
+      position: absolute;
+      top: 5px; right: 5px;
+      z-index: 100;
+    }
+    .window-controls-wrapper.is-fullscreen {
+      top: 0; right: 0;
+      padding: 12px 12px 20px 20px;
+      border-radius: 0 0 0 12px;
+    }
+    .window-controls-wrapper.is-fullscreen .window-controls {
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      pointer-events: none;
+    }
+    .window-controls-wrapper.is-fullscreen:hover .window-controls {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .fullscreen-btn {
+      width: 32px; height: 32px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #357abd;
+      background: rgba(255,255,255,0.95);
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 50%;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .fullscreen-btn:hover {
+      background: #fff;
+      color: #2d5aa0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    }
+    .top-header {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 40px;
+      background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+      border-bottom: 2px solid #2d5aa0;
+    }
+    .header-center {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .exam-name {
+      font-size: 42px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 2px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      white-space: nowrap;
+    }
+    .header-right {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+    .time-display {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+    .date-text { font-size: 16px; color: #fff; font-weight: 500; opacity: 0.95; }
+    .time-text {
+      font-size: 28px;
+      color: #fff;
+      font-weight: 700;
+      letter-spacing: 2px;
+      font-variant-numeric: tabular-nums;
+    }
+    .main-display-area {
+      flex: 0;
+      padding: 0;
+      background: #fff;
+    }
+    .table-container {
+      width: 100%;
+      height: 620px;
+      overflow-x: hidden;
+      overflow-y: auto;
+      position: relative;
+      -webkit-overflow-scrolling: touch;
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .data-table thead {
+      background: linear-gradient(135deg, #5ba3f5 0%, #4a90e2 100%);
+    }
+    .data-table th {
+      padding: 22px 20px;
+      text-align: center;
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+      border-right: 1px solid rgba(255,255,255,0.2);
+      letter-spacing: 1px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: linear-gradient(135deg, #5ba3f5 0%, #4a90e2 100%);
+    }
+    .data-table th:last-child { border-right: none; }
+    .col-name { width: 12%; }
+    .col-work { width: 18%; }
+    .col-job { width: 12%; }
+    .col-start { width: 14%; }
+    .col-end { width: 14%; }
+    .col-room { width: 12%; }
+    .col-status { width: 10%; }
+    .table-row {
+      background: #fff;
+      border-bottom: 1px solid #e0e7ef;
+      transition: all 0.3s ease;
+    }
+    .table-row:hover { background: #f5f9fc; }
+    .table-row.current-row {
+      background: #fff4e6;
+      border-left: 4px solid #ff9800;
+      box-shadow: 0 2px 8px rgba(255,152,0,0.2);
+    }
+    .table-row td {
+      padding: 24px 20px;
+      text-align: center;
+      font-size: 24px;
+      color: #2c3e50;
+      border-right: 1px solid #e0e7ef;
+      vertical-align: middle;
+      word-wrap: break-word;
+    }
+    .table-row td:last-child { border-right: none; }
+    .status-badge {
+      display: inline-block;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-size: 18px;
+      font-weight: 600;
+      min-width: 90px;
+    }
+    .status-calling {
+      background: #fff3e0;
+      color: #f57c00;
+      border: 1px solid #ffb74d;
+    }
+    .status-waiting {
+      background: #e3f2fd;
+      color: #1976d2;
+      border: 1px solid #64b5f6;
+    }
+    .status-called {
+      background: #e8f5e9;
+      color: #388e3c;
+      border: 1px solid #81c784;
+    }
+    .bottom-scroll-banner {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2d5aa0 100%);
+      color: #fff;
+      padding: 20px 0;
+      overflow: hidden;
+      border-top: 2px solid #1a4d7a;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+      width: 100%;
+      min-height: 70px;
+      display: flex;
+      align-items: center;
+      margin-top: 2px;
+    }
+    .bottom-scroll-banner.empty { display: none; }
+    .scroll-content {
+      display: inline-flex;
+      white-space: nowrap;
+      will-change: transform;
+      animation: scroll-horizontal 40s linear infinite;
+      min-width: 200%;
+    }
+    @keyframes scroll-horizontal {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .call-message {
+      display: inline-block;
+      font-size: 24px;
+      font-weight: 600;
+      padding: 0 150px;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+    .call-name-highlight {
+      color: #ffd54f;
+      font-size: 28px;
+      font-weight: 700;
+      text-shadow: 0 0 10px rgba(255,213,79,0.5);
+    }
+    .call-number-highlight { color: #81d4fa; font-weight: 700; }
+    .call-room-highlight {
+      color: #ff9800;
+      font-size: 26px;
+      font-weight: 700;
+      text-shadow: 0 0 10px rgba(255,152,0,0.5);
+    }
+    .call-subject-highlight { color: #4caf50; font-weight: 700; }
+    @media (max-width: 1600px) {
+      .exam-name { font-size: 34px; }
+      .data-table th, .table-row td { font-size: 20px; padding: 20px 16px; }
+      .status-badge { font-size: 16px; padding: 6px 18px; }
+      .call-message { font-size: 22px; }
+    }
+    @media (max-width: 1400px) {
+      .exam-name { font-size: 28px; }
+      .data-table th, .table-row td { font-size: 18px; padding: 18px 14px; }
+      .status-badge { font-size: 14px; padding: 6px 14px; }
+      .call-message { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="led-screen-container">
+    <div id="fullscreenRef" class="led-frame">
+      <div id="windowControlsWrapper" class="window-controls-wrapper">
+        <div class="window-controls">
+          <button type="button" class="fullscreen-btn" id="fullscreenBtn" title="全屏">
+            <span id="fullscreenIcon">⛶</span>
+          </button>
+        </div>
+      </div>
+      <div class="top-header">
+        <div class="header-center">
+          <div class="exam-name" id="examName">叫号系统</div>
+        </div>
+        <div class="header-right">
+          <div class="time-display">
+            <div class="date-text" id="currentDateStr"></div>
+            <div class="time-text" id="currentTimeStr"></div>
+          </div>
+        </div>
+      </div>
+      <div class="main-display-area">
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th class="col-name">考生姓名</th>
+                <th class="col-work">身份证号</th>
+                <th class="col-job">工种</th>
+                <th class="col-start">开始时间</th>
+                <th class="col-end">结束时间</th>
+                <th class="col-room">考场</th>
+                <th class="col-status">状态</th>
+              </tr>
+            </thead>
+            <tbody class="table-body" id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="bottomScrollBanner" class="bottom-scroll-banner empty">
+        <div class="scroll-content" id="scrollContent"></div>
+      </div>
+    </div>
+  </div>
 
-    <body>
-        <main class="container">
-            <h1>Welcome to PakePlus</h1>
-            <form class="row" id="greet-form">
-                <input id="inputValue" placeholder="Enter a something..." />
-            </form>
-            <div class="resultBox">
-                <span>result: </span>
-                <span id="result"></span>
-            </div>
-            <div class="invokeBox">
-                <button id="openUrl" type="button">open_url_browser</button>
-                <button id="openUrlNew" type="button">open_url_new</button>
-                <button id="runCommand" type="button">run_command</button>
-                <button id="downloadFile" type="button">download_file</button>
-                <button id="getExeDir" type="button">get_exe_dir</button>
-                <button id="getEnvVar" type="button">get_env_var</button>
-                <button id="findPort" type="button">find_port</button>
-                <button id="openAskDialog" type="button">openAskDialog</button>
-                <button id="openConfirmDialog" type="button">
-                    openConfirmDialog
-                </button>
-                <button id="openMessageDialog" type="button">
-                    openMessageDialog
-                </button>
-                <button id="openFileDialog" type="button">
-                    openFileDialog
-                </button>
-                <button id="openDirDialog" type="button">openDirDialog</button>
-                <button id="openSaveDialog" type="button">
-                    openSaveDialog
-                </button>
-                <button id="videoTest" type="button">VideoTest</button>
-                <!-- file api -->
-                <button id="createFile" type="button">createFile</button>
-                <button id="writeTextFile" type="button">writeTextFile</button>
-                <button id="writeBinaryFile" type="button">
-                    writeBinaryFile
-                </button>
-                <button id="readTextFile" type="button">readTextFile</button>
-                <button id="readBinaryFile" type="button">
-                    readBinaryFile
-                </button>
-                <button id="readFile" type="button">readFile</button>
-                <button id="openFile" type="button">openFile</button>
-                <button id="readDir" type="button">readDir</button>
-                <button id="mkdir" type="button">mkdir</button>
-                <button id="watch" type="button">watch</button>
-                <button id="watchImmediate" type="button">
-                    watchImmediate
-                </button>
-                <button id="size" type="button">size</button>
-                <button id="exists" type="button">exists</button>
-                <button id="remove" type="button">remove</button>
-                <button id="copyFile" type="button">copyFile</button>
-                <button id="rename" type="button">rename</button>
-            </div>
-            <video
-                src="https://gh-proxy.org/https://github.com/worker500/FileHub/blob/main/root/IronMan.mp4"
-                controls
-                width="100%"
-                height="100%"
-                class="video"
-            ></video>
-        </main>
-    </body>
+  <script>
+    (function () {
+      // 接口基础路径：与前端同源可留空；单独打开本页时填后端地址，如 'http://localhost:48080'
+      var API_BASE = 'https://exam-api.yunszg.com';
+      // var API_BASE = 'http://121.89.84.14:48002';
+
+      function apiUrl(path) {
+        var p = (path || '').replace(/^\//, '');
+        var b = (API_BASE || '').replace(/\/$/, '');
+        return b ? b + '/' + p : '/' + p;
+      }
+
+      // 状态 0：等待中，1：考核中(已入场)，2：已完成
+      function getStatusClass(status) {
+        var code = String(status);
+        if (code === '1') return 'status-calling';
+        if (code === '2') return 'status-called';
+        return 'status-waiting';
+      }
+
+      function getStatusText(status) {
+        var code = String(status);
+        if (code === '1') return '已入场';
+        if (code === '2') return '已完成';
+        return '待入场';
+      }
+
+      function formatExamTime(val) {
+        if (val == null || val === '') return '-';
+        var date = typeof val === 'number' ? new Date(val) : new Date(val);
+        if (isNaN(date.getTime())) return '-';
+        var y = date.getFullYear();
+        var m = String(date.getMonth() + 1).padStart(2, '0');
+        var d = String(date.getDate()).padStart(2, '0');
+        var h = String(date.getHours()).padStart(2, '0');
+        var min = String(date.getMinutes()).padStart(2, '0');
+        return y + '-' + m + '-' + d + ' ' + h + ':' + min;
+      }
+
+      function updateClock() {
+        var now = new Date();
+        var h = String(now.getHours()).padStart(2, '0');
+        var m = String(now.getMinutes()).padStart(2, '0');
+        var s = String(now.getSeconds()).padStart(2, '0');
+        document.getElementById('currentTimeStr').textContent = h + ':' + m + ':' + s;
+        var weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+        document.getElementById('currentDateStr').textContent =
+          now.getFullYear() + '年' + String(now.getMonth() + 1).padStart(2, '0') + '月' +
+          String(now.getDate()).padStart(2, '0') + '日 ' + weekdays[now.getDay()];
+      }
+
+      function normExamItem(item) {
+        if (!item) return null;
+        return {
+          testId: item.testId != null ? item.testId : item.id,
+          testName: item.testName || item.name || '',
+          testStatus: item.testStatus,
+          testVenuesName: item.testVenuesName || item.venueName || '',
+          startTime: item.startTime,
+          endTime: item.endTime
+        };
+      }
+
+      function normUserItem(item) {
+        if (!item) return null;
+        var status = item.testStatus != null ? item.testStatus : item.status;
+        return {
+          id: item.id,
+          testId: item.testId != null ? item.testId : item.examId,
+          nickname: item.nickname || item.name || item.realName || '',
+          cardNumber: item.cardNumber || item.idCard || item.number || '',
+          postName: item.postName || item.department || item.workType || item.jobType || '',
+          testStatus: status,
+          status: status
+        };
+      }
+
+      function parseExamList(res) {
+        if (!res) return [];
+        var raw = res.data != null ? res.data : res;
+        var arr = Array.isArray(raw) ? raw : (raw && raw.list ? raw.list : raw && raw.records ? raw.records : []);
+        return (arr || []).map(normExamItem).filter(Boolean);
+      }
+
+      function parseUserList(res) {
+        if (!res) return [];
+        var raw = res.data != null ? res.data : res;
+        var arr = Array.isArray(raw) ? raw : (raw && raw.list ? raw.list : raw && raw.records ? raw.records : []);
+        return (arr || []).map(normUserItem).filter(Boolean);
+      }
+
+      var examList = [];
+      var allUserList = [];
+      var currentExamIndex = 0;
+      var currentTestId = null;
+      var tableDisplayList = [];
+      var currentTestStartTime = null;
+      var currentTestEndTime = null;
+      var examVenuesName = '';
+      var TABLE_SCROLL_MS = 3000;
+      var TABLE_SCROLL_ROWS = 1;
+      var TABLE_SCROLL_INTERVAL = null;
+
+      function getUserListForTable() {
+        return allUserList.filter(function (item) { return item.testId === currentTestId; });
+      }
+
+      function getCurrentCall() {
+        var list = getUserListForTable();
+        var cur = list.find(function (item) {
+          var s = item.testStatus != null ? item.testStatus : item.status;
+          return Number(s) === 1;
+        });
+        return cur || null;
+      }
+
+      function getScrollBarUserList() {
+        return allUserList.filter(function (item) {
+          var s = item.testStatus != null ? item.testStatus : item.status;
+          return Number(s) === 1;
+        });
+      }
+
+      function getScrollBarUserListWithVenue() {
+        return getScrollBarUserList().map(function (person) {
+          var exam = examList.find(function (e) { return e.testId === person.testId; });
+          var obj = {};
+          for (var k in person) obj[k] = person[k];
+          obj.venueName = exam ? (exam.testVenuesName || '') : '';
+          return obj;
+        });
+      }
+
+      function doTableScrollUp() {
+        if (tableDisplayList.length === 0) return;
+        var step = Math.min(TABLE_SCROLL_ROWS, tableDisplayList.length);
+        tableDisplayList = tableDisplayList.slice(step).concat(tableDisplayList.slice(0, step));
+        renderTable();
+      }
+
+      function renderTable() {
+        var tbody = document.getElementById('tableBody');
+        var currentCall = getCurrentCall();
+        tbody.innerHTML = '';
+        tableDisplayList.forEach(function (item) {
+          var tr = document.createElement('tr');
+          tr.className = 'table-row' + (currentCall && item.id === currentCall.id ? ' current-row' : '');
+          tr.innerHTML =
+            '<td class="col-name">' + escapeHtml(item.nickname) + '</td>' +
+            '<td class="col-work">' + escapeHtml(item.cardNumber) + '</td>' +
+            '<td class="col-job">' + escapeHtml(item.postName) + '</td>' +
+            '<td class="col-start">' + formatExamTime(currentTestStartTime) + '</td>' +
+            '<td class="col-end">' + formatExamTime(currentTestEndTime) + '</td>' +
+            '<td class="col-room">' + escapeHtml(examVenuesName) + '</td>' +
+            '<td class="col-status"><span class="status-badge ' + getStatusClass(item.testStatus) + '">' + escapeHtml(getStatusText(item.testStatus)) + '</span></td>';
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderScrollBar() {
+        var banner = document.getElementById('bottomScrollBanner');
+        var content = document.getElementById('scrollContent');
+        var examNameVal = document.getElementById('examName').textContent || '叫号系统';
+        var list = getScrollBarUserListWithVenue();
+        if (!list || list.length === 0) {
+          banner.classList.add('empty');
+          content.innerHTML = '';
+          return;
+        }
+        banner.classList.remove('empty');
+        var html = '';
+        list.forEach(function (p) {
+          var msg = '请 <span class="call-name-highlight">' + escapeHtml(p.nickname) + '</span> 身份证号<span class="call-number-highlight">' + escapeHtml(p.cardNumber) + '</span> 前往 <span class="call-room-highlight">' + escapeHtml(p.venueName || '') + '</span> 参加 <span class="call-subject-highlight">' + escapeHtml(examNameVal) + '</span> 考试';
+          html += '<span class="call-message">' + msg + '</span>';
+        });
+        content.innerHTML = html + html;
+      }
+
+      function escapeHtml(str) {
+        if (str == null) return '';
+        var s = String(str);
+        var div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+      }
+
+      function fetchJson(url) {
+        return fetch(apiUrl(url), { method: 'GET', headers: { 'Accept': 'application/json', 'Tenant-Id': 1128 } })
+          .then(function (res) { return res.json(); })
+          .catch(function (err) {
+            console.error('请求失败:', url, err);
+            return null;
+          });
+      }
+
+      function fetchExamList() {
+        return fetchJson('admin-api/business/practical-test/page?pageNo=1&pageSize=100')
+          .then(function (res) {
+            var newList = parseExamList(res);
+            examList = newList;
+            if (examList.length > 0) {
+              currentExamIndex = 0;
+              var cur = examList[0];
+              document.getElementById('examName').textContent = cur.testName;
+              examVenuesName = cur.testVenuesName || '';
+              currentTestId = cur.testId;
+              currentTestStartTime = cur.startTime;
+              currentTestEndTime = cur.endTime;
+            } else {
+              document.getElementById('examName').textContent = '叫号系统';
+              currentTestId = null;
+              examVenuesName = '';
+            }
+            return examList;
+          })
+          .catch(function (err) {
+            console.error('获取考试列表失败:', err);
+            examList = [];
+            document.getElementById('examName').textContent = '叫号系统';
+            currentTestId = null;
+            examVenuesName = '';
+            return [];
+          });
+      }
+
+      function loadAllExamsUsers() {
+        return fetchJson('admin-api/business/practical-test/all-user-list')
+          .then(function (res) {
+            allUserList = parseUserList(res);
+            syncTableDisplayList();
+            renderTable();
+            renderScrollBar();
+            return allUserList;
+          })
+          .catch(function (err) {
+            console.error('获取考核人员列表失败:', err);
+            allUserList = [];
+            syncTableDisplayList();
+            renderTable();
+            renderScrollBar();
+            return [];
+          });
+      }
+
+      function syncTableDisplayList() {
+        var list = getUserListForTable();
+        tableDisplayList = list ? list.slice() : [];
+      }
+
+      function loadData() {
+          fetchExamList().then(function () {
+            loadAllExamsUsers();
+          });
+      }
+
+      function toggleFullscreen() {
+        var el = document.getElementById('fullscreenRef');
+        var wrapper = document.getElementById('windowControlsWrapper');
+        var icon = document.getElementById('fullscreenIcon');
+        var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+        if (isFs) {
+          var exitFn = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+          if (exitFn) exitFn.call(document);
+        } else {
+          var reqFn = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+          if (reqFn) reqFn.call(el);
+        }
+      }
+
+      function onFullscreenChange() {
+        var el = document.getElementById('fullscreenRef');
+        var wrapper = document.getElementById('windowControlsWrapper');
+        var icon = document.getElementById('fullscreenIcon');
+        var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+        el.classList.toggle('is-fullscreen', isFs);
+        wrapper.classList.toggle('is-fullscreen', isFs);
+        icon.textContent = isFs ? '✕' : '⛶';
+      }
+
+      document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
+      document.addEventListener('fullscreenchange', onFullscreenChange);
+      document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
+      updateClock();
+      setInterval(updateClock, 1000);
+      loadData();
+
+      setTimeout(function () {
+        TABLE_SCROLL_INTERVAL = setInterval(function () {
+          if (getUserListForTable().length > 0) doTableScrollUp();
+        }, TABLE_SCROLL_MS);
+      }, 400);
+    })();
+  </script>
+</body>
 </html>
