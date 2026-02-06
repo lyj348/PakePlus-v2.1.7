@@ -413,6 +413,9 @@
       var TABLE_SCROLL_MS = 3000;
       var TABLE_SCROLL_ROWS = 1;
       var TABLE_SCROLL_INTERVAL = null;
+      var DATA_REFRESH_MS = 5000;
+      var DATA_REFRESH_INTERVAL = null;
+      var isInitialDataLoad = true;
 
       function getUserListForTable() {
         return allUserList.filter(function (item) { return item.testId === currentTestId; });
@@ -536,34 +539,50 @@
           });
       }
 
-      function loadAllExamsUsers() {
+      function loadAllExamsUsers(isRefresh) {
         return fetchJson('admin-api/business/practical-test/all-user-list')
           .then(function (res) {
             allUserList = parseUserList(res);
-            syncTableDisplayList();
+            syncTableDisplayList(isRefresh);
             renderTable();
             renderScrollBar();
+            if (isInitialDataLoad) isInitialDataLoad = false;
             return allUserList;
           })
           .catch(function (err) {
             console.error('获取考核人员列表失败:', err);
             allUserList = [];
-            syncTableDisplayList();
+            syncTableDisplayList(isRefresh);
             renderTable();
             renderScrollBar();
             return [];
           });
       }
 
-      function syncTableDisplayList() {
+      function syncTableDisplayList(isRefresh) {
         var list = getUserListForTable();
-        tableDisplayList = list ? list.slice() : [];
+        if (!isRefresh || isInitialDataLoad || !list || list.length === 0) {
+          tableDisplayList = list ? list.slice() : [];
+          return;
+        }
+        var newMap = {};
+        list.forEach(function (u) { newMap[u.id] = u; });
+        var merged = [];
+        tableDisplayList.forEach(function (oldItem) {
+          var updated = newMap[oldItem.id];
+          if (updated) {
+            merged.push(updated);
+            delete newMap[oldItem.id];
+          }
+        });
+        for (var id in newMap) merged.push(newMap[id]);
+        tableDisplayList = merged;
       }
 
-      function loadData() {
-          fetchExamList().then(function () {
-            loadAllExamsUsers();
-          });
+      function loadData(isRefresh) {
+        fetchExamList().then(function () {
+          loadAllExamsUsers(isRefresh);
+        });
       }
 
       function toggleFullscreen() {
@@ -596,7 +615,11 @@
 
       updateClock();
       setInterval(updateClock, 1000);
-      loadData();
+      loadData(false);
+
+      DATA_REFRESH_INTERVAL = setInterval(function () {
+        loadData(true);
+      }, DATA_REFRESH_MS);
 
       setTimeout(function () {
         TABLE_SCROLL_INTERVAL = setInterval(function () {
