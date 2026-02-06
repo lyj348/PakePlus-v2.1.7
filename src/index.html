@@ -223,8 +223,8 @@
       display: inline-flex;
       white-space: nowrap;
       will-change: transform;
-      animation: scroll-horizontal 40s linear infinite;
-      min-width: 200%;
+      animation: scroll-horizontal 120s linear infinite;
+      flex-shrink: 0;
     }
     @keyframes scroll-horizontal {
       0% { transform: translateX(0); }
@@ -478,6 +478,7 @@
         var content = document.getElementById('scrollContent');
         var examNameVal = document.getElementById('examName').textContent || '叫号系统';
         var list = getScrollBarUserListWithVenue();
+        console.log('[底部滚动条] 已入场人员列表:', list);
         if (!list || list.length === 0) {
           banner.classList.add('empty');
           content.innerHTML = '';
